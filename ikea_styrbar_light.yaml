@@ -1,0 +1,166 @@
+blueprint:
+  name: Ikea STYRBAR automation light
+  description: Turn a light on/off - increase/decrease brightness - set color and temperature
+  domain: automation
+  source_url: http://localhost.it
+  input:
+    remote:
+      name: Ikea STYRBAR 2001/2002
+      description: This remote device will manage the light.
+      selector:
+        entity:
+          domain: sensor
+    target_light:
+      name: Light color
+      description: The light color to keep in sync.
+      selector:
+        entity:
+          domain: light
+    force_brightness:
+      name: Force turn on brightness
+      description: Force the brightness to the set level below, when the "on" button
+        on the remote is pushed and lights turn on.
+      default: false
+      selector:
+        boolean: {}
+    brightness:
+      name: Brightness
+      description: Brightness of the light(s) when turning on
+      default: 100
+      selector:
+        number:
+          min: 0.0
+          max: 100.0
+          mode: slider
+          step: 1.0
+          unit_of_measurement: '%'
+    hue:
+      name: Hue
+      description: Hue of light(s) when turning on.
+      default: 180.0
+      selector:
+        number:
+          min: 0.0
+          max: 360.0
+          mode: slider
+          unit_of_measurement: 'rad'
+    saturation:
+      name: Saturation
+      description: Saturation of light(s) when turning on.
+      default: 100
+      selector:
+        number:
+          min: 0.0
+          max: 100.0
+          mode: slider
+          step: 1.0
+          unit_of_measurement: '%'
+    kelvin:
+      name: Color temperature
+      description: Color temperature of light(s) when turning on.
+      default: 4000.0
+      selector:
+        number:
+          min: 2000.0
+          max: 6500.0
+          mode: slider
+          step: 100.0
+          unit_of_measurement: '°K'
+mode: restart
+max_exceeded: silent
+variables:
+  force_brightness: !input 'force_brightness'
+  hue: !input 'hue'
+  saturation: !input 'saturation'
+trigger:
+- platform: state
+  entity_id: !input remote
+trigger_variables:
+  input_light: !input target_light
+action:
+- variables:
+    command: "{{ trigger.to_state.state }}"
+    loop_delay: 1000
+- choose:
+  - conditions:
+    - "{{ command == 'on' }}"
+    sequence:
+    - choose:
+      - conditions: '{{ force_brightness }}'
+        sequence:
+        - service: light.turn_on
+          target:
+            entity_id: !input target_light
+          data:
+            brightness_pct: !input 'brightness'
+            kelvin: !input kelvin
+      default:
+      - service: light.turn_on
+        target: 
+          entity_id: !input target_light
+  - conditions:
+    - "{{ command == 'off' }}"
+    sequence:
+    - service: light.turn_off
+      target:
+        entity_id: !input target_light  
+  - conditions:
+      - "{{ command == 'brightness_move_up' }}"
+      - "{{ (10 + (state_attr(input_light, 'brightness_step_pct') or 0)) <= 100 }}"
+    sequence:
+    - repeat:
+        count: 10
+        sequence:
+        - service: light.turn_on
+          target: 
+            entity_id: !input target_light
+          data:
+            brightness_step_pct: 10
+            transition: 1
+        - delay: 0.5
+  - conditions:
+      - "{{ command == 'brightness_move_down' }}"
+      - >-
+        {{ (10 + (state_attr(input_light, 'brightness_step_pct') or 0)) <= 100
+        }}
+    sequence:
+    - repeat:
+        count: 10
+        sequence:
+        - service: light.turn_on
+          target: 
+            entity_id: !input target_light
+          data:
+            brightness_step_pct: -10
+            transition: 1
+        - delay: 0.5
+  - conditions:
+    - "{{ command == 'arrow_left_click' }}"
+    sequence:
+    - service: light.turn_on
+      target:
+        entity_id: !input target_light
+      data:
+        hs_color:
+        - "{{ state_attr(input_light, 'hs_color')[0] }}"
+        - >-
+            {% if ((10 + (state_attr(input_light, 'hs_color')[1] or 0)) > 100)  %}
+              0
+            {% else %}
+              {{ (10 + (state_attr(input_light, 'hs_color')[1] or 0)) }}
+            {% endif %}
+  - conditions:
+    - "{{ command == 'arrow_right_click' }}"
+    sequence:
+    - service: light.turn_on
+      target:
+        entity_id: !input target_light
+      data:
+        hs_color:
+        - >-
+            {% if ((30 + (state_attr(input_light, 'hs_color')[0] or 0)) > 360)  %}
+              0
+            {% else %}
+              {{ (30 + (state_attr(input_light, 'hs_color')[0] or 0)) }}
+            {% endif %}
+        - "{{ state_attr(input_light, 'hs_color')[1] }}"
