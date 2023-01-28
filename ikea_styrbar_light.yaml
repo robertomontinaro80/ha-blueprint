@@ -2,7 +2,7 @@ blueprint:
   name: Ikea STYRBAR automation light
   description: Turn a light on/off - increase/decrease brightness - set color and temperature
   domain: automation
-  source_url: http://localhost.it
+  source_url: https://github.com/robertomontinaro80/ha-blueprint/blob/main/ikea_styrbar_light.yaml
   input:
     remote:
       name: Ikea STYRBAR 2001/2002
