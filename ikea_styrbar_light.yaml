@@ -2,7 +2,7 @@ blueprint:
   name: Ikea STYRBAR automation light
   description: Turn a light on/off - increase/decrease brightness - set color and temperature
   domain: automation
-  source_url: https://github.com/robertomontinaro80/ha-blueprint/blob/main/ikea_styrbar_light.yaml
+  source_url: http://localhost.it
   input:
     remote:
       name: Ikea STYRBAR 2001/2002
@@ -37,17 +37,7 @@ blueprint:
     hue:
       name: Hue
       description: Hue of light(s) when turning on.
-      default: 180.0
-      selector:
-        number:
-          min: 0.0
-          max: 360.0
-          mode: slider
-          unit_of_measurement: 'rad'
-    saturation:
-      name: Saturation
-      description: Saturation of light(s) when turning on.
-      default: 100
+      default: 100.0
       selector:
         number:
           min: 0.0
@@ -55,6 +45,17 @@ blueprint:
           mode: slider
           step: 1.0
           unit_of_measurement: '%'
+    saturation:
+      name: Saturation
+      description: Saturation of light(s) when turning on.
+      default: 180.0
+      selector:
+        number:
+          min: 0.0
+          max: 360.0
+          mode: slider
+          step: 10.0
+          unit_of_measurement: 'rad'
     kelvin:
       name: Color temperature
       description: Color temperature of light(s) when turning on.
@@ -80,7 +81,6 @@ trigger_variables:
 action:
 - variables:
     command: "{{ trigger.to_state.state }}"
-    loop_delay: 1000
 - choose:
   - conditions:
     - "{{ command == 'on' }}"
@@ -116,12 +116,12 @@ action:
             entity_id: !input target_light
           data:
             brightness_step_pct: 10
-            transition: 1
+            transition: 0.5
         - delay: 0.5
   - conditions:
       - "{{ command == 'brightness_move_down' }}"
       - >-
-        {{ (10 + (state_attr(input_light, 'brightness_step_pct') or 0)) <= 100
+        {{ ((state_attr(input_light, 'brightness_step_pct') or 0) - 10) >= 1
         }}
     sequence:
     - repeat:
@@ -132,7 +132,7 @@ action:
             entity_id: !input target_light
           data:
             brightness_step_pct: -10
-            transition: 1
+            transition: 0.5
         - delay: 0.5
   - conditions:
     - "{{ command == 'arrow_left_click' }}"
@@ -142,13 +142,13 @@ action:
         entity_id: !input target_light
       data:
         hs_color:
-        - "{{ state_attr(input_light, 'hs_color')[0] }}"
         - >-
-            {% if ((10 + (state_attr(input_light, 'hs_color')[1] or 0)) > 100)  %}
-              0
+            {% if (((state_attr(input_light, 'hs_color')[0] or 0) - 30) < 0)  %}
+              360
             {% else %}
-              {{ (10 + (state_attr(input_light, 'hs_color')[1] or 0)) }}
+              {{ ((state_attr(input_light, 'hs_color')[0] or 0) - 30) }}
             {% endif %}
+        - "{{ saturation }}"
   - conditions:
     - "{{ command == 'arrow_right_click' }}"
     sequence:
@@ -163,4 +163,4 @@ action:
             {% else %}
               {{ (30 + (state_attr(input_light, 'hs_color')[0] or 0)) }}
             {% endif %}
-        - "{{ state_attr(input_light, 'hs_color')[1] }}"
+        - "{{ saturation }}"
