@@ -37,17 +37,6 @@ blueprint:
     hue:
       name: Hue
       description: Hue of light(s) when turning on.
-      default: 100.0
-      selector:
-        number:
-          min: 0.0
-          max: 100.0
-          mode: slider
-          step: 1.0
-          unit_of_measurement: '%'
-    saturation:
-      name: Saturation
-      description: Saturation of light(s) when turning on.
       default: 180.0
       selector:
         number:
@@ -67,12 +56,11 @@ blueprint:
           mode: slider
           step: 100.0
           unit_of_measurement: '°K'
-mode: restart
+mode: single
 max_exceeded: silent
 variables:
   force_brightness: !input 'force_brightness'
   hue: !input 'hue'
-  saturation: !input 'saturation'
 trigger:
 - platform: state
   entity_id: !input remote
@@ -82,8 +70,7 @@ action:
 - variables:
     command: "{{ trigger.to_state.state }}"
 - choose:
-  - conditions:
-    - "{{ command == 'on' }}"
+  - conditions: "{{ command == 'on' }}"
     sequence:
     - choose:
       - conditions: '{{ force_brightness }}'
@@ -98,42 +85,11 @@ action:
       - service: light.turn_on
         target: 
           entity_id: !input target_light
-  - conditions:
-    - "{{ command == 'off' }}"
+  - conditions: "{{ command == 'off' }}"
     sequence:
     - service: light.turn_off
       target:
         entity_id: !input target_light  
-  - conditions:
-      - "{{ command == 'brightness_move_up' }}"
-      - "{{ (10 + (state_attr(input_light, 'brightness_step_pct') or 0)) <= 100 }}"
-    sequence:
-    - repeat:
-        count: 10
-        sequence:
-        - service: light.turn_on
-          target: 
-            entity_id: !input target_light
-          data:
-            brightness_step_pct: 10
-            transition: 0.5
-        - delay: 0.5
-  - conditions:
-      - "{{ command == 'brightness_move_down' }}"
-      - >-
-        {{ ((state_attr(input_light, 'brightness_step_pct') or 0) - 10) >= 1
-        }}
-    sequence:
-    - repeat:
-        count: 10
-        sequence:
-        - service: light.turn_on
-          target: 
-            entity_id: !input target_light
-          data:
-            brightness_step_pct: -10
-            transition: 0.5
-        - delay: 0.5
   - conditions:
     - "{{ command == 'arrow_left_click' }}"
     sequence:
@@ -148,7 +104,7 @@ action:
             {% else %}
               {{ ((state_attr(input_light, 'hs_color')[0] or 0) - 30) }}
             {% endif %}
-        - "{{ saturation }}"
+        - 100        
   - conditions:
     - "{{ command == 'arrow_right_click' }}"
     sequence:
@@ -163,4 +119,30 @@ action:
             {% else %}
               {{ (30 + (state_attr(input_light, 'hs_color')[0] or 0)) }}
             {% endif %}
-        - "{{ saturation }}"
+        - 100
+  - conditions: 
+    - "{{ (command == 'brightness_move_up') }}"
+    sequence:
+    - repeat:
+        until: "{{ repeat.index == 10 }}" 
+        sequence:
+        - service: light.turn_on
+          target: 
+            entity_id: !input target_light
+          data:
+            brightness_step_pct: 10
+            transition: 0.5
+        - delay: 1
+  - conditions: 
+    - "{{ (command == 'brightness_move_down') }}"
+    sequence:
+    - repeat:
+        until: "{{ repeat.index == 10 }}" 
+        sequence:
+        - service: light.turn_on
+          target: 
+            entity_id: !input target_light
+          data:
+            brightness_step_pct: -10
+            transition: 0.5
+        - delay: 1
