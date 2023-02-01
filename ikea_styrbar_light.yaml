@@ -123,26 +123,28 @@ action:
   - conditions: 
     - "{{ (command == 'brightness_move_up') }}"
     sequence:
-    - repeat:
-        until: "{{ repeat.index == 10 or ((state_attr(input_light, 'brightness') or 0) + 25.5) > 255 }}" 
-        sequence:
-        - service: light.turn_on
-          target: 
-            entity_id: !input target_light
-          data:
-            brightness_step_pct: 10
-            transition: 0.5
-        - delay: 1
+    - service: light.turn_on
+      target: 
+        entity_id: !input target_light
+      data:
+        brightness_step_pct: >-
+          {% if ((25.5 + (state_attr(input_light, 'brightness') or 0)) > 255)  %}
+            0
+          {% else %}
+            10
+          {% endif %}
+        transition: 0.5
   - conditions: 
     - "{{ (command == 'brightness_move_down') }}"
     sequence:
-    - repeat:
-        until: "{{ repeat.index == 10 or ((state_attr(input_light, 'brightness') or 0) - 25.5) < 0 }}" 
-        sequence:
-        - service: light.turn_on
-          target: 
-            entity_id: !input target_light
-          data:
-            brightness_step_pct: -10
-            transition: 0.5
-        - delay: 1
+    - service: light.turn_on
+      target: 
+        entity_id: !input target_light
+      data:
+        brightness_step_pct: >-
+          {% if (((state_attr(input_light, 'brightness') or 0) - 25.5) < 0)  %}
+            0
+          {% else %}
+            -10
+          {% endif %}
+        transition: 0.5
