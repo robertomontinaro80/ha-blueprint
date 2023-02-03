@@ -61,6 +61,7 @@ max_exceeded: silent
 variables:
   force_brightness: !input 'force_brightness'
   hue: !input 'hue'
+  kelvin: !input 'kelvin'
 trigger:
 - platform: state
   entity_id: !input remote
@@ -133,7 +134,6 @@ action:
           {% else %}
             10
           {% endif %}
-        transition: 0.5
   - conditions: 
     - "{{ (command == 'brightness_move_down') }}"
     sequence:
@@ -147,4 +147,29 @@ action:
           {% else %}
             -10
           {% endif %}
-        transition: 0.5
+  - conditions: 
+    - "{{ (command == 'arrow_left_hold') }}"
+    sequence:
+    - service: light.turn_on
+      target: 
+        entity_id: !input target_light
+      data:
+        color_temp: >-
+          {% if (((state_attr(input_light, 'color_temp') or 0) + 100) > 500)  %}
+            500
+          {% else %}
+            {{ (state_attr(input_light, 'color_temp') or 0) + 100 }}
+          {% endif %}
+  - conditions: 
+    - "{{ (command == 'arrow_right_hold') }}"
+    sequence:
+    - service: light.turn_on
+      target: 
+        entity_id: !input target_light
+      data:
+        color_temp: >-
+          {% if (((state_attr(input_light, 'color_temp') or 0) - 100) < 153)  %}
+            153
+          {% else %}
+            {{ (state_attr(input_light, 'color_temp') or 0) - 100 }}
+          {% endif %}
