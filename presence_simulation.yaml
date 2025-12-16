@@ -1,0 +1,137 @@
+blueprint:
+  name: Simulatore di Presenza con Luci e Interruttori
+  description: >
+    Simula la presenza in casa accendendo e spegnendo casualmente luci e interruttori
+    dal tramonto fino ad un orario specificato. Il numero di dispositivi accesi varia
+    tra 1 e 2, con intervalli randomici configurabili.
+  domain: automation
+  
+  input:
+    target_lights:
+      name: Luci
+      description: Seleziona le luci da controllare
+      selector:
+        target:
+          entity:
+            - domain: light
+    
+    target_switches:
+      name: Interruttori
+      description: Seleziona gli interruttori da controllare
+      selector:
+        target:
+          entity:
+            - domain: switch
+    
+    presence_sensor:
+      name: Sensore di Presenza
+      description: Binary sensor che indica se c'è qualcuno in casa (l'automazione si attiva quando è OFF/false)
+      selector:
+        entity:
+          domain: binary_sensor
+    
+    end_time:
+      name: Ora di Fine
+      description: Orario in cui terminare la simulazione
+      selector:
+        time:
+      default: "23:30:00"
+    
+    base_interval:
+      name: Intervallo Base (minuti)
+      description: Tempo medio tra le accensioni/spegnimenti (verrà randomizzato di alcuni secondi)
+      selector:
+        number:
+          min: 1
+          max: 60
+          step: 1
+          unit_of_measurement: "min"
+      default: 15
+
+trigger:
+  - platform: sun
+    event: sunset
+    offset: "00:00:00"
+  - platform: state
+    entity_id: !input presence_sensor
+    to: "off"
+
+condition:
+  - condition: state
+    entity_id: !input presence_sensor
+    state: "off"
+  - condition: sun
+    after: sunset
+
+action:
+  - repeat:
+      while:
+        - condition: time
+          before: !input end_time
+        - condition: sun
+          after: sunset
+        - condition: state
+          entity_id: !input presence_sensor
+          state: "off"
+      sequence:
+        # Spegni tutti i dispositivi prima di accendere quelli nuovi
+        - service: light.turn_off
+          target: !input target_lights
+        - service: switch.turn_off
+          target: !input target_switches
+        
+        # Aspetta un momento per simulare comportamento naturale
+        - delay:
+            seconds: "{{ range(2, 8) | random }}"
+        
+        # Calcola il numero di dispositivi da accendere (1 o 2)
+        - variables:
+            target_lights: !input target_lights
+            target_switches: !input target_switches
+            num_devices: "{{ range(1, 3) | random }}"
+        
+        # Crea lista di tutte le entità selezionate
+        - variables:
+            light_entities: >
+              {{ expand(target_lights) | map(attribute='entity_id') | list }}
+            switch_entities: >
+              {{ expand(target_switches) | map(attribute='entity_id') | list }}
+            all_devices: >
+              {{ light_entities + switch_entities }}
+        
+        # Accendi 1-2 dispositivi casuali
+        - repeat:
+            count: "{{ num_devices }}"
+            sequence:
+              - variables:
+                  random_device: "{{ all_devices | random }}"
+              
+              - choose:
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ random_device.startswith('light.') }}"
+                    sequence:
+                      - service: light.turn_on
+                        target:
+                          entity_id: "{{ random_device }}"
+                        data:
+                          brightness_pct: "{{ range(40, 101) | random }}"
+                  
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ random_device.startswith('switch.') }}"
+                    sequence:
+                      - service: switch.turn_on
+                        target:
+                          entity_id: "{{ random_device }}"
+              
+              - delay:
+                  seconds: "{{ range(1, 4) | random }}"
+        
+        # Attendi l'intervallo base + randomizzazione
+        - delay:
+            minutes: !input base_interval
+            seconds: "{{ range(-30, 31) | random }}"
+
+mode: single
+max_exceeded: silent
