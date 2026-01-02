@@ -84,20 +84,27 @@ action:
         - delay:
             seconds: "{{ range(2, 8) | random }}"
         
-        # Calcola il numero di dispositivi da accendere (1 o 2)
+        # Prepara tutte le variabili necessarie
         - variables:
             target_lights: !input target_lights
             target_switches: !input target_switches
-            num_devices: "{{ range(1, 3) | random }}"
-        
-        # Crea lista di tutte le entità selezionate
-        - variables:
             light_entities: >
-              {{ expand(target_lights) | map(attribute='entity_id') | list }}
+              {% set ns = namespace(entities=[]) %}
+              {% for entity in expand(target_lights) %}
+                {% set ns.entities = ns.entities + [entity.entity_id] %}
+              {% endfor %}
+              {{ ns.entities }}
             switch_entities: >
-              {{ expand(target_switches) | map(attribute='entity_id') | list }}
+              {% set ns = namespace(entities=[]) %}
+              {% for entity in expand(target_switches) %}
+                {% set ns.entities = ns.entities + [entity.entity_id] %}
+              {% endfor %}
+              {{ ns.entities }}
             all_devices: >
-              {{ light_entities + switch_entities }}
+              {% set lights = light_entities %}
+              {% set switches = switch_entities %}
+              {{ lights + switches }}
+            num_devices: "{{ range(1, 3) | random }}"
         
         # Accendi 1-2 dispositivi casuali
         - repeat:
